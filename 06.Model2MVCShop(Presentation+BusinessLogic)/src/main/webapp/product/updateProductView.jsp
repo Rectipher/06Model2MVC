@@ -17,33 +17,47 @@
 
 <!-- ==== Paging inputs (clamped) ==== -->
 <c:set var="page"     value="${empty searchVO.page     or searchVO.page     lt 1 ? 1  : searchVO.page}"/>
-<c:set var="pageSize" value="${empty searchVO.pageSize or searchVO.pageSize lt 1 ? 10 : searchVO.pageSize}"/>
-<!-- pageUnit = how many numbered links to show per block -->
-<c:set var="pageUnit" value="${empty searchVO.pageUnit or searchVO.pageUnit lt 1 ? 10 : searchVO.pageUnit}"/>
+<c:set var="pageSize" value="${empty searchVO.pageSize or searchVO.pageSize lt 1 ? 8  : searchVO.pageSize}"/>   <!-- 8, not 10 -->
+<c:set var="pageUnit" value="${empty searchVO.pageUnit or searchVO.pageUnit lt 1 ? 10 : searchVO.pageUnit}"/>   <!-- keep 10 -->
 
 <!-- Search params (for rebuilding links) -->
 <c:set var="sc" value="${empty searchVO.searchCondition ? '' : searchVO.searchCondition}" />
 <c:set var="sk" value="${empty searchVO.searchKeyword   ? '' : searchVO.searchKeyword}" />
 
 
-
 <!-- ==== Derived paging values (integer math) ==== -->
-<c:set var="lastPage"   value="${total == 0 ? 1 : ((total + pageSize - 1) div pageSize)}"/>
+<c:set var="lastPage" value="${total == 0 ? 1 : ((total + pageSize - 1) div pageSize)}"/>
 <c:if test="${page > lastPage}">
   <c:set var="page" value="${lastPage}"/>
 </c:if>
 
+
+
+
+<!-- 
 <c:set var="blockIndex" value="${(page - 1) div pageUnit}"/>
 <c:set var="startPage"  value="${blockIndex * pageUnit + 1}"/>
 <c:set var="endPage"    value="${startPage + pageUnit - 1}"/>
 <c:if test="${endPage > lastPage}">
   <c:set var="endPage" value="${lastPage}"/>
 </c:if>
+ -->
+
+
+
+
+<!-- Sliding group window -->
+<c:set var="groupStart" value="${(((page - 1) div pageUnit) * pageUnit) + 1}"/>
+<c:set var="groupEnd"   value="${groupStart + pageUnit - 1}"/>
+<c:if test="${groupEnd > lastPage}">
+  <c:set var="groupEnd" value="${lastPage}"/>
+</c:if>
+
 
 <c:set var="pageBase"   value="${(page - 1) * pageSize}"/>
 <c:set var="rowStartNo" value="${total - pageBase}"/>
 
-<!-- (optional) if you want to keep the names used in the pager below -->
+<!-- Optional compatibility names -->
 <c:set var="currentPage" value="${page}"/>
 <c:set var="totalPage"   value="${lastPage}"/>
 
@@ -208,45 +222,46 @@
   <tr>
     <td align="center">
 
-      <!-- « previous group -->
-      <c:if test="${startPage > 1}">
-        <c:url var="prevGrp" value="${ctx}/updateProductView.do">
-          <c:param name="page"            value="${startPage - 1}"/>
-          <c:param name="pageSize"        value="${pageSize}"/>
-          <c:param name="searchCondition" value="${sc}"/>
-          <c:param name="searchKeyword"   value="${sk}"/>
-        </c:url>
-        <a href="${prevGrp}">&laquo;</a>
-      </c:if>
-
-      <!-- numbered pages -->
-      <c:forEach var="i" begin="${startPage}" end="${endPage}">
-        <c:choose>
-          <c:when test="${i == page}">
-            <strong>[${i}]</strong>
-          </c:when>
-          <c:otherwise>
-            <c:url var="pUrl" value="${ctx}/updateProductView.do">
-              <c:param name="page"            value="${i}"/>
-              <c:param name="pageSize"        value="${pageSize}"/>
-              <c:param name="searchCondition" value="${sc}"/>
-              <c:param name="searchKeyword"   value="${sk}"/>
-            </c:url>
-            <a href="${pUrl}">[${i}]</a>
-          </c:otherwise>
-        </c:choose>
-      </c:forEach>
-
-      <!-- » next group -->
-      <c:if test="${endPage < lastPage}">
-        <c:url var="nextGrp" value="${ctx}/updateProductView.do">
-          <c:param name="page"            value="${endPage + 1}"/>
-          <c:param name="pageSize"        value="${pageSize}"/>
-          <c:param name="searchCondition" value="${sc}"/>
-          <c:param name="searchKeyword"   value="${sk}"/>
-        </c:url>
-        <a href="${nextGrp}">&raquo;</a>
-      </c:if>
+     <!-- « previous group -->
+		<c:if test="${groupStart > 1}">
+		  <c:url var="prevGrp" value="${ctx}/updateProductView.do">
+		    <c:param name="page"            value="${groupStart - 1}"/>
+		    <c:param name="pageSize"        value="${pageSize}"/>
+		    <c:param name="searchCondition" value="${sc}"/>
+		    <c:param name="searchKeyword"   value="${sk}"/>
+		  </c:url>
+		  <a href="${prevGrp}">&laquo;</a>
+		</c:if>
+		
+		<!-- numbered pages -->
+		<c:forEach var="i" begin="${groupStart}" end="${groupEnd}">
+		  <c:choose>
+		    <c:when test="${i == page}">
+		      <strong>[${i}]</strong>
+		    </c:when>
+		    <c:otherwise>
+		      <c:url var="pUrl" value="${ctx}/updateProductView.do">
+		        <c:param name="page"            value="${i}"/>
+		        <c:param name="pageSize"        value="${pageSize}"/>
+		        <c:param name="searchCondition" value="${sc}"/>
+		        <c:param name="searchKeyword"   value="${sk}"/>
+		      </c:url>
+		      <a href="${pUrl}">[${i}]</a>
+		    </c:otherwise>
+		  </c:choose>
+		</c:forEach>
+		
+		<!-- » next group -->
+		<c:if test="${groupEnd < lastPage}">
+		  <c:url var="nextGrp" value="${ctx}/updateProductView.do">
+		    <c:param name="page"            value="${groupEnd + 1}"/>
+		    <c:param name="pageSize"        value="${pageSize}"/>
+		    <c:param name="searchCondition" value="${sc}"/>
+		    <c:param name="searchKeyword"   value="${sk}"/>
+		  </c:url>
+		  <a href="${nextGrp}">&raquo;</a>
+		</c:if>
+		     
 
     </td>
   </tr>
