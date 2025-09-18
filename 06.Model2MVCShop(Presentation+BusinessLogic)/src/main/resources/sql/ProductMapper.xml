@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- Adjust namespace to your project convention if needed -->
+<mapper namespace="com.model2.mvc.service.product.ProductMapper">
+
+  <!-- ================== Result Mapping (matches Product getters/setters) ================== -->
+  <!-- Product has: prodNo, prodName, prodDetail, manuDate, price, fileName, regDate -->
+  <resultMap id="ProductResultMap" type="com.model2.mvc.service.domain.Product">
+    <id     property="prodNo"    column="PROD_NO"/>
+    <result property="prodName"  column="PROD_NAME"/>
+    <result property="prodDetail" column="PROD_DETAIL"/>
+    <result property="manuDate"  column="MANUFACTURE_DAY"/>
+    <result property="price"     column="PRICE"/>
+    <result property="fileName"  column="IMAGE_FILE"/>
+    <result property="regDate"   column="REG_DATE"/>
+  </resultMap>
+
+
+
+  <sql id="ProductColumns">
+    p.PROD_NO, p.PROD_NAME, p.PROD_DETAIL, p.MANUFACTURE_DAY, p.PRICE, p.IMAGE_FILE, p.REG_DATE
+  </sql>
+
+  <!-- ================== Shared WHERE (mirrors JDBC DAO logic) ==================
+       searchCondition:
+         - "1"  => exact match on PROD_NO (numeric)
+         - else => PROD_NAME LIKE %keyword%
+       No LOWER()/case-insensitive transform (kept identical to DAO).
+  -->
+  
+  <sql id="ProductSearchWhere">
+    <where>
+      <if test="searchKeyword != null and searchKeyword.trim() != ''">
+        <choose>
+          <when test="searchCondition == '1'">
+            AND p.PROD_NO = TO_NUMBER(#{searchKeyword})
+          </when>
+          <otherwise>
+            AND p.PROD_NAME LIKE '%' || #{searchKeyword} || '%'
+          </otherwise>
+        </choose>
+      </if>
+    </where>
+  </sql>
+
+
+
+  <!-- ================== findProduct(int prodNo) ================== -->
+  <select id="findProduct" parameterType="int" resultMap="ProductResultMap">
+    SELECT <include refid="ProductColumns"/>
+      FROM PRODUCT p
+     WHERE p.PROD_NO = #{prodNo}
+  </select>
+
+  <!-- ================== insertProduct(Product) ==================
+       JDBC version uses: seq_product_prod_no.NEXTVAL and then CURRVAL to set VO.prodNo.
+       We do the same with <selectKey>.
+  -->
+  <insert id="insertProduct" parameterType="com.model2.mvc.service.domain.Product">
+    INSERT INTO PRODUCT
+      (PROD_NO, PROD_NAME, PROD_DETAIL, MANUFACTURE_DAY, PRICE, IMAGE_FILE, REG_DATE)
+    VALUES
+      (seq_product_prod_no.NEXTVAL, #{prodName}, #{prodDetail}, #{manuDate},
+       #{price}, #{fileName}, SYSDATE)
+
+    <!-- AFTER insert, fetch CURRVAL like your DAO -->
+    <selectKey keyProperty="prodNo" resultType="int" order="AFTER">
+      SELECT seq_product_prod_no.CURRVAL FROM dual
+    </selectKey>
+  </insert>
+
+  <!-- ================== updateProduct(Product) ==================
+       Field order mirrors your JDBC UPDATE exactly.
+  -->
+  <update id="updateProduct" parameterType="com.model2.mvc.service.domain.Product">
+    UPDATE PRODUCT
+       SET IMAGE_FILE      = #{fileName},
+           MANUFACTURE_DAY = #{manuDate},
+           PRICE           = #{price},
+           PROD_DETAIL     = #{prodDetail},
+           PROD_NAME       = #{prodName}
+     WHERE PROD_NO         = #{prodNo}
+  </update>
+
+  <!-- ================== getProductList(Search) ==================
+       - Same WHERE rules as DAO
+       - Sort by PROD_NO DESC (as in your pageSql)
+       - Oracle ROWNUM pagination: requires Search.startRowNum / endRowNum
+         (compute these in Service like you already do per [Error05.1]/ROWNUM_Objective)
+  -->
+  <select id="getProductList"
+          parameterType="com.model2.mvc.common.Search"
+          resultMap="ProductResultMap">
+    SELECT *
+      FROM (
+        SELECT ROWNUM rn, a.*
+          FROM (
+            SELECT <include refid="ProductColumns"/>
+              FROM PRODUCT p
+              <include refid="ProductSearchWhere"/>
+             ORDER BY p.PROD_NO DESC
+          ) a
+         WHERE ROWNUM &lt;= #{endRowNum}
+      )
+     WHERE rn &gt;= #{startRowNum}
+  </select>
+
+  <!-- ================== getTotalCount(Search) ==================
+       Uses the same WHERE block (exact parity with list).
+  -->
+  <select id="getTotalCount"
+          parameterType="com.model2.mvc.common.Search"
+          resultType="int">
+    SELECT COUNT(1)
+      FROM PRODUCT p
+      <include refid="ProductSearchWhere"/>
+  </select>
+
+</mapper>
