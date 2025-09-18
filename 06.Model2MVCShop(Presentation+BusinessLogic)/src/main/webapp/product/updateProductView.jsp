@@ -123,6 +123,15 @@
     </td>
     <td class="ct_line02"></td>
     <td align="center">${vo.proTranCode}</td>
+    
+       <!-- 수정 버튼 → /updateProductPageView.do -->
+       <td align="center">
+         <c:url var="editUrl" value="${ctx}/updateProductPageView.do">
+           <c:param name="prodNo" value="${vo.prodNo}" />
+         </c:url>
+         <a href="${editUrl}">수정</a>
+       </td>
+       
   </tr>
   <tr><td colspan="11" bgcolor="D6D7D6" height="1"></td></tr>
 </c:forEach>
