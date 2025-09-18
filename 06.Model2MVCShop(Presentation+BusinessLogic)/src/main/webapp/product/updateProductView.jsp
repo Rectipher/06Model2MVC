@@ -1,277 +1,155 @@
 <%@ page contentType="text/html; charset=UTF-8" %>
-<%@ taglib prefix="c"   uri="http://java.sun.com/jsp/jstl/core" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt" %>
-<%@ taglib prefix="fn"  uri="http://java.sun.com/jsp/jstl/functions" %>
+<%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
 
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 
-<!-- ==== Model wiring ==== -->
-<c:set var="map"      value="${requestScope.map}" />
-<c:set var="list"     value="${empty map ? null : map.list}" />
+
+<c:set var="map" value="${requestScope.map}" />
+<c:set var="list" value="${empty map ? null : map.list}" />
 <c:set var="searchVO" value="${requestScope.searchVO}" />
-<c:set var="product"  value="${requestScope.product}" />
 
-<!-- Total rows (prefer map.totalCount; fallback to list length) -->
-<c:set var="total"
-  value="${not empty map.totalCount ? map.totalCount : (not empty map.count ? map.count : fn:length(list))}"/>
+<c:set var="total" value="${empty map.count ? 0 : map.count}" />
+<c:set var="currentPage" value="${empty searchVO.page or searchVO.page <= 0 ? 1 : searchVO.page}" />
+<c:set var="pageUnit" value="${empty searchVO.pageUnit or searchVO.pageUnit <= 0 ? 10 : searchVO.pageUnit}" />
+<c:set var="totalPage" value="${(total + pageUnit - 1) / pageUnit}" />
 
-<!-- ==== Paging inputs (clamped) ==== -->
-<c:set var="page"     value="${empty searchVO.page     or searchVO.page     lt 1 ? 1  : searchVO.page}"/>
-<c:set var="pageSize" value="${empty searchVO.pageSize or searchVO.pageSize lt 1 ? 8  : searchVO.pageSize}"/>   <!-- 8, not 10 -->
-<c:set var="pageUnit" value="${empty searchVO.pageUnit or searchVO.pageUnit lt 1 ? 10 : searchVO.pageUnit}"/>   <!-- keep 10 -->
+<c:set var="pageGroupSize" value="10" />
+<c:set var="startPage" value="${ ((currentPage-1) - ((currentPage-1) % pageGroupSize)) + 1 }" />
+<c:set var="endPage" value="${ (startPage + pageGroupSize - 1) > totalPage ? totalPage : (startPage + pageGroupSize - 1) }" />
 
-<!-- Search params (for rebuilding links) -->
 <c:set var="sc" value="${empty searchVO.searchCondition ? '' : searchVO.searchCondition}" />
-<c:set var="sk" value="${empty searchVO.searchKeyword   ? '' : searchVO.searchKeyword}" />
-
-
-<!-- ==== Derived paging values (integer math) ==== -->
-<c:set var="lastPage" value="${total == 0 ? 1 : ((total + pageSize - 1) div pageSize)}"/>
-<c:if test="${page > lastPage}">
-  <c:set var="page" value="${lastPage}"/>
-</c:if>
-
-
-
-
-<!-- 
-<c:set var="blockIndex" value="${(page - 1) div pageUnit}"/>
-<c:set var="startPage"  value="${blockIndex * pageUnit + 1}"/>
-<c:set var="endPage"    value="${startPage + pageUnit - 1}"/>
-<c:if test="${endPage > lastPage}">
-  <c:set var="endPage" value="${lastPage}"/>
-</c:if>
- -->
-
-
-
-
-<!-- Sliding group window -->
-<c:set var="groupStart" value="${(((page - 1) div pageUnit) * pageUnit) + 1}"/>
-<c:set var="groupEnd"   value="${groupStart + pageUnit - 1}"/>
-<c:if test="${groupEnd > lastPage}">
-  <c:set var="groupEnd" value="${lastPage}"/>
-</c:if>
-
-
-<c:set var="pageBase"   value="${(page - 1) * pageSize}"/>
-<c:set var="rowStartNo" value="${total - pageBase}"/>
-
-<!-- Optional compatibility names -->
-<c:set var="currentPage" value="${page}"/>
-<c:set var="totalPage"   value="${lastPage}"/>
-
-
-
-
+<c:set var="sk" value="${empty searchVO.searchKeyword ? '' : searchVO.searchKeyword}" />
+<c:set var="pageSize" value="${pageUnit}" />
 
 <html>
 <head>
-  <title>상품 목록 / 관리</title>
-  <link rel="stylesheet" href="${ctx}/css/admin.css" type="text/css">
-  <script type="text/javascript">
-    function fncSearch(){ document.searchForm.submit(); }
-  </script>
+<title>상품 관리</title>
+<link rel="stylesheet" href="/css/admin.css" type="text/css">
+<script type="text/javascript">
+  function fncUpdateProductView(){
+    document.searchForm.submit();
+  }
+</script>
 </head>
+
 <body bgcolor="#ffffff" text="#000000">
 
-  <!-- Title / buttons -->
-  <table width="100%" border="0" cellspacing="0" cellpadding="0">
+<!-- 상단 제목 바 -->
+<table width="100%" height="37" border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="15" height="37"><img src="/images/ct_ttl_img01.gif" width="15" height="37"></td>
+    <td background="/images/ct_ttl_img02.gif" width="100%" style="padding-left:10px;">
+      <table width="100%" border="0" cellspacing="0" cellpadding="0">
+        <tr><td width="93%" class="ct_ttl01">상품 목록 조회</td></tr>
+      </table>
+    </td>
+    <td width="12" height="37"><img src="/images/ct_ttl_img03.gif" width="12" height="37"></td>
+  </tr>
+</table>
+
+<!-- 검색 바 -->
+<form name="searchForm" method="get" action="/updateProductView.do">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top:10px;">
     <tr>
-      <td class="ct_ttl01">상품 목록 / 관리</td>
       <td align="right">
+        <select name="searchCondition" class="ct_input_g" style="width:80px">
+          <option value="0" ${sc == '0' ? 'selected' : ''}>상품명</option>
+          <option value="1" ${sc == '1' ? 'selected' : ''}>상품번호</option>
+        </select>
+        <input type="text" name="searchKeyword"
+               value="${sk}"
+               class="ct_input_g" style="width:200px; height:19px">
+      </td>
+      <td align="right" width="70">
         <table border="0" cellspacing="0" cellpadding="0">
           <tr>
-            <td width="17" height="23"><img src="${ctx}/images/ct_btnbg01.gif" width="17" height="23" /></td>
-            <td background="${ctx}/images/ct_btnbg02.gif" class="ct_btn01" style="padding-top:3px;">
-              <a href="${ctx}/listSale.do">판매목록</a>
+            <td width="17" height="23"><img src="/images/ct_btnbg01.gif" width="17" height="23"></td>
+            <td background="/images/ct_btnbg02.gif" class="ct_btn01" style="padding-top:3px;">
+              <a href="javascript:fncUpdateProductView();">검색</a>
             </td>
-            <td width="14" height="23"><img src="${ctx}/images/ct_btnbg03.gif" width="14" height="23" /></td>
+            <td width="14" height="23"><img src="/images/ct_btnbg03.gif" width="14" height="23"></td>
           </tr>
         </table>
       </td>
     </tr>
   </table>
+</form>
 
-  <!-- Selected product (shown only when prodNo was provided) -->
-  <c:if test="${not empty product}">
-    <table width="100%" border="0" cellspacing="0" cellpadding="8" style="margin-top:10px; border:1px solid #D6D7D6;">
-      <tr>
-        <td>
-          <b>선택된 상품:</b>
-          <span style="margin-left:8px">
-            [No. ${product.prodNo}] ${product.prodName}
-            / 가격: <fmt:formatNumber value="${product.price}" type="number"/>
-            / 등록일: <fmt:formatDate value="${product.regDate}" pattern="yyyy-MM-dd"/>
-            / 상태: ${product.proTranCode}
-          </span>
-          <span style="float:right">
-            <c:url var="editUrl" value="${ctx}/updateProductPageView.do">
-              <c:param name="prodNo" value="${product.prodNo}" />
-            </c:url>
-            <a href="${editUrl}">▶ 수정 페이지로 이동</a>
-          </span>
-        </td>
-      </tr>
-    </table>
-  </c:if>
-
-  <!-- Search bar -->
-  <form name="searchForm" method="get" action="${ctx}/updateProductView.do">
-    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top:10px;">
-      <tr>
-        <td align="right">
-          <select name="searchCondition" class="ct_input_g" style="width:90px">
-            <option value="0" <c:if test="${sc eq '0'}">selected</c:if>>상품명</option>
-            <option value="1" <c:if test="${sc eq '1'}">selected</c:if>>상품번호</option>
-          </select>
-          <input type="text" name="searchKeyword" value="${sk}" class="ct_input_g" style="width:220px; height:19px">
-        </td>
-        <td align="right" width="80">
-          <table border="0" cellspacing="0" cellpadding="0">
-            <tr>
-              <td width="17" height="23"><img src="${ctx}/images/ct_btnbg01.gif" width="17" height="23"></td>
-              <td background="${ctx}/images/ct_btnbg02.gif" class="ct_btn01" style="padding-top:3px;">
-                <a href="javascript:fncSearch();">검색</a>
-              </td>
-              <td width="14" height="23"><img src="${ctx}/images/ct_btnbg03.gif" width="14" height="23"></td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-    <!-- keep current page/pageSize on submit -->
-    <input type="hidden" name="page" value="${page}"/>
-    <input type="hidden" name="pageSize" value="${pageSize}"/>
-  </form>
-
-  <!-- Summary -->
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top:10px;">
-    <tr>
-      <td>전체 ${total} 건수, 현재 ${page} 페이지</td>
-    </tr>
-  </table>
-
-  <!-- Header -->
-  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top:10px;">
-    <tr>
-      <td class="ct_list_b" width="80">No</td>
-      <td class="ct_line02"></td>
-      <td class="ct_list_b">상품명</td>
-      <td class="ct_line02"></td>
-      <td class="ct_list_b" width="120">가격</td>
-      <td class="ct_line02"></td>
-      <td class="ct_list_b" width="140">등록일</td>
-      <td class="ct_line02"></td>
-      <td class="ct_list_b" width="120">현재 상태</td>
-      <td class="ct_line02"></td>
-      <td class="ct_list_b" width="90">작업</td>
-    </tr>
-    <tr><td colspan="11" bgcolor="808285" height="1"></td></tr>
-
-    <!-- Rows -->
-    <c:forEach var="p" items="${list}" varStatus="st">
-      <c:set var="no" value="${rowStartNo - st.index}"/>
-      <c:if test="${no < 0}"><c:set var="no" value="0"/></c:if>
-
-      <tr class="ct_list_pop">
-        <td align="center">${no}</td>
-        <td class="ct_line02"></td>
-
-        <!-- 상품명 → same page with prodNo to pre-load selection -->
-        <td style="padding-left:10px;">
-          <c:url var="viewUrl" value="${ctx}/updateProductView.do">
-            <c:param name="prodNo" value="${p.prodNo}"/>
-            <c:param name="searchCondition" value="${sc}"/>
-            <c:param name="searchKeyword"  value="${sk}"/>
-            <c:param name="page"           value="${page}"/>
-            <c:param name="pageSize"       value="${pageSize}"/>
-          </c:url>
-          <a href="${viewUrl}">${p.prodName}</a>
-        </td>
-
-        <td class="ct_line02"></td>
-        <td align="right" style="padding-right:10px;"><fmt:formatNumber value="${p.price}" type="number"/></td>
-        <td class="ct_line02"></td>
-        <td align="center"><fmt:formatDate value="${p.regDate}" pattern="yyyy-MM-dd"/></td>
-        <td class="ct_line02"></td>
-        <td align="center">${p.proTranCode}</td>
-        <td class="ct_line02"></td>
-
-        <!-- 수정 버튼 → /updateProductPageView.do -->
-        <td align="center">
-          <c:url var="editUrl" value="${ctx}/updateProductPageView.do">
-            <c:param name="prodNo" value="${p.prodNo}" />
-          </c:url>
-          <a href="${editUrl}">수정</a>
-        </td>
-      </tr>
-      <tr><td colspan="11" bgcolor="D6D7D6" height="1"></td></tr>
-    </c:forEach>
-  </table>
-
-
-
-
-
-
-<!-- 페이징 (괄호 없이 숫자 링크만) -->
-<!-- 페이징 : 10개씩 묶어서 표시 + 이전/다음 그룹 화살표 -->
-
+<!-- 요약 행 -->
 <table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top:10px;">
   <tr>
-    <td align="center">
-
-     <!-- « previous group -->
-		<c:if test="${groupStart > 1}">
-		  <c:url var="prevGrp" value="${ctx}/updateProductView.do">
-		    <c:param name="page"            value="${groupStart - 1}"/>
-		    <c:param name="pageSize"        value="${pageSize}"/>
-		    <c:param name="searchCondition" value="${sc}"/>
-		    <c:param name="searchKeyword"   value="${sk}"/>
-		  </c:url>
-		  <a href="${prevGrp}">&laquo;</a>
-		</c:if>
-		
-		<!-- numbered pages -->
-		<c:forEach var="i" begin="${groupStart}" end="${groupEnd}">
-		  <c:choose>
-		    <c:when test="${i == page}">
-		      <strong>[${i}]</strong>
-		    </c:when>
-		    <c:otherwise>
-		      <c:url var="pUrl" value="${ctx}/updateProductView.do">
-		        <c:param name="page"            value="${i}"/>
-		        <c:param name="pageSize"        value="${pageSize}"/>
-		        <c:param name="searchCondition" value="${sc}"/>
-		        <c:param name="searchKeyword"   value="${sk}"/>
-		      </c:url>
-		      <a href="${pUrl}">[${i}]</a>
-		    </c:otherwise>
-		  </c:choose>
-		</c:forEach>
-		
-		<!-- » next group -->
-		<c:if test="${groupEnd < lastPage}">
-		  <c:url var="nextGrp" value="${ctx}/updateProductView.do">
-		    <c:param name="page"            value="${groupEnd + 1}"/>
-		    <c:param name="pageSize"        value="${pageSize}"/>
-		    <c:param name="searchCondition" value="${sc}"/>
-		    <c:param name="searchKeyword"   value="${sk}"/>
-		  </c:url>
-		  <a href="${nextGrp}">&raquo;</a>
-		</c:if>
-		     
-
-    </td>
+    <td colspan="11">전체 ${total} 건수, 현재 ${currentPage} 페이지</td>
   </tr>
 </table>
 
+<!-- 목록 헤더 -->
+<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top:10px;">
+  <tr>
+    <td class="ct_list_b" width="100">No</td>
+    <td class="ct_line02"></td>
+    <td class="ct_list_b">상품명</td>
+    <td class="ct_line02"></td>
+    <td class="ct_list_b" width="120">가격</td>
+    <td class="ct_line02"></td>
+    <td class="ct_list_b" width="140">등록일</td>
+    <td class="ct_line02"></td>
+    <td class="ct_list_b" width="140">현재 상태</td>
+  </tr>
+  <tr><td colspan="11" bgcolor="808285" height="1"></td></tr>
 
+<c:set var="no" value="${total - ((currentPage - 1) * pageUnit)}" />
 
+<c:forEach var="vo" items="${list}" varStatus="st">
+  <tr class="ct_list_pop">
+    <td align="center">${no - st.index}</td>
+    <td class="ct_line02"></td>
+    <td style="padding-left:10px;">
+      <a href="/getProduct.do?prodNo=${vo.prodNo}">${vo.prodName}</a>
+    </td>
+    <td class="ct_line02"></td>
+    <td align="right" style="padding-right:10px;">
+      <fmt:formatNumber value="${vo.price}" type="number" />
+    </td>
+    <td class="ct_line02"></td>
+    <td align="center">
+      <c:choose>
+        <c:when test="${not empty vo.regDate}">
+          <fmt:formatDate value="${vo.regDate}" pattern="yyyy-MM-dd" />
+        </c:when>
+        <c:otherwise>-</c:otherwise>
+      </c:choose>
+    </td>
+    <td class="ct_line02"></td>
+    <td align="center">${vo.proTranCode}</td>
+  </tr>
+  <tr><td colspan="11" bgcolor="D6D7D6" height="1"></td></tr>
+</c:forEach>
 
-
-
+<!-- 페이징 -->
+<table width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-top:10px;">
+  <tr>
+    <td align="center">
+      <c:if test="${startPage > 1}">
+        <a href="/updateProductView.do?page=${startPage - 1}&searchCondition=${sc}&searchKeyword=${sk}&pageSize=${pageSize}">&laquo;</a>
+      </c:if>
+      <c:forEach var="i" begin="${startPage}" end="${endPage}">
+        <c:choose>
+          <c:when test="${i == currentPage}">
+            <strong>[${i}]</strong>
+          </c:when>
+          <c:otherwise>
+            <a href="/updateProductView.do?page=${i}&searchCondition=${sc}&searchKeyword=${sk}&pageSize=${pageSize}">[${i}]</a>
+          </c:otherwise>
+        </c:choose>
+      </c:forEach>
+      <c:if test="${endPage < totalPage}">
+        <a href="/updateProductView.do?page=${endPage + 1}&searchCondition=${sc}&searchKeyword=${sk}&pageSize=${pageSize}">&raquo;</a>
+      </c:if>
+    </td>
+  </tr>
+</table>
 
 </body>
 </html>
